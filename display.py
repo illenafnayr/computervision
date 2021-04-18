@@ -1,18 +1,21 @@
 #import os
 #import re
 import time
+import PIL
+from PIL import Image
 import cv2
 import numpy as np
+from numpy import asarray
 #from os.path import isfile, join
 from matplotlib import pyplot as plt
 
-vidcap = cv2.VideoCapture('test_nyc.mp4')
+vidcap = cv2.VideoCapture('test_road.mp4')
 cap = cv2.VideoCapture(0)
 success,image = vidcap.read()
 count = 0
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
 out = cv2.VideoWriter('output.avi', fourcc, 20.0, (640,480))
-car_classifier = cv2.CascadeClassifier('Haarcascades/cars.xml')
+car_classifier = cv2.CascadeClassifier('Haarcascades/haarcascade_car.xml')
 while (vidcap.isOpened()):
     ret, frame = vidcap.read()
     if ret == True:
@@ -21,6 +24,21 @@ while (vidcap.isOpened()):
         count += 1
         print(count, ret)
 
+        # load the image
+        image = Image.open('houghlines3.jpg')
+        # convert image to numpy array
+        data = asarray(image)
+        # print(type(data))
+        # summarize shape
+        # print(data.shape)
+
+        # create Pillow image
+        image2 = Image.fromarray(data)
+        # print(type(image2))
+
+        # summarize image details
+        # print(image2.mode)
+        # print(image2.size)
 
         # get file names of the frames
 #        col_frames = os.listdir('frames/')
@@ -56,13 +74,15 @@ while (vidcap.isOpened()):
 
 
         # Gray
+        # threshold, thresh = cv2.threshold(frame, 150, 255, cv2.THRESH_BINARY)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-#        cv2.imshow('Gray', gray)
+        blur = cv2.GaussianBlur(gray, (5, 5), 5)
+        # cv2.imshow('Gray', gray)
 
         # Simple Thresholding
-#        threshold, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-#        cv2.imshow('Simple Threshold', thresh)
-#        cv2.imwrite("frame%d.jpg" % count, thresh)     # save frame as JPEG file      
+        threshold, thresh = cv2.threshold(frame, 150, 255, cv2.THRESH_BINARY)
+        cv2.imshow('Simple Threshold', thresh)
+ #       cv2.imwrite("frame%d.jpg" % count, thresh)     # save frame as JPEG file      
 
 
         # frame = cv2.imread(frame, 0)
@@ -106,20 +126,42 @@ while (vidcap.isOpened()):
         # sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
 #        combinedSobel = cv2.bitwise_or(sobelx, sobely)
 
-        # cv2.imshow('Sobel X', sobelx)
+#        cv2.imshow('Sobel X', sobelx)
         # cv2.imshow('Sobel Y', sobely)
 #        cv2.imshow('Combined Sobel', combinedSobel)
 
         # Canny
-        canny = cv2.Canny(frame, 100, 150, apertureSize = 3)
-#        cv2.imshow('Canny', canny)
+        edges = cv2.Canny(gray, 50, 150, apertureSize = 3)
+        # cv2.imshow('Canny', canny)
+        lines = cv2.HoughLines(edges,1,np.pi/180,200)
+        for rho,theta in lines[0]:
+                a = np.cos(theta)
+                b = np.sin(theta)
+                x0 = a*rho
+                y0 = b*rho
+                x1 = int(x0 + 1000*(-b))
+                y1 = int(y0 + 1000*(a))
+                x2 = int(x0 - 1000*(-b))
+                y2 = int(y0 - 1000*(a))
+                print('a: ', a,'b: ', b, 'x0, y0: ', x0, y0, 'x1, y1: ', x1, y1, 'x2, y2: ', x2, y2)
+                cv2.line(frame,(x1,y1),(x2,y2),(255,0,0),2)
 
-#        time.sleep(0.05)
+        cv2.imwrite('houghlines3.jpg', frame)
+
+        minLineLength = 200
+        maxLineGap = 30
+        lines = cv2.HoughLinesP(edges,1,np.pi/180,100,minLineLength,maxLineGap)
+        for x1,y1,x2,y2 in lines[0]:
+                cv2.line(frame,(x1,y1),(x2,y2),(0,255,0),10)
+
+        cv2.imwrite('houghlines5.jpg',frame)
+
+        time.sleep(0.05)
         cars = car_classifier.detectMultiScale(gray, 1.4, 2)
 
         for (x,y,w,h) in cars:
-            cv2.rectangle(frame, (x,y), (x+h, y+h), (0, 255, 255), 2)
-            cv2.imshow('Cars', frame)
+           cv2.rectangle(frame, (x,y), (x+h, y+h), (0, 255, 255), 2)
+           cv2.imshow('Cars', frame)
         # Haris Corner
 #        dst = cv2.cornerHarris(gray, blockSize=2, ksize=3, k=0.04)
 
@@ -127,7 +169,7 @@ while (vidcap.isOpened()):
 #        dst = cv2.dilate(dst, None)
 #        frame[dst > 0.01 * dst.max()] = [0, 255, 0]
 
-#        cv2.imshow('haris_corner', frame)
+ #       cv2.imshow('haris_corner', frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
