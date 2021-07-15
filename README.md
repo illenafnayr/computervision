@@ -12,3 +12,6 @@ harris corner
 lanedetection
   hough line transform
 vehicle/object detection?
+
+###To Run:
+python display.py
